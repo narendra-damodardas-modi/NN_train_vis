@@ -1,0 +1,88 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import random
+from torch.utils.data import TensorDataset,DataLoader
+
+
+def plot_single(x):
+  x = np.array(x)
+  plt.plot(x)
+  plt.title("Loss Plot")
+  plt.xlabel("Epoch")
+  plt.ylabel("Loss")
+  plt.grid(True)
+  plt.show()
+def plot(x, y, x1, y1):
+    x = x.cpu().numpy()
+    y = y.cpu().numpy()
+    x1 = x1.cpu().numpy()
+    y1 = y1.detach().cpu().numpy()
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(x, y, label='Real function', color='blue')
+    plt.plot(x1, y1, label='Learnt by network', color='red')
+    plt.xlabel('X-axis')
+    plt.ylabel('Y-axis')
+    plt.title('Function Approximation')
+    plt.legend()
+    plt.show()
+
+def funtion(x):
+  #return 2 * x**5 - 4 * x**4 + 3 * x**3 + 5 * x**2 - 10 * x + 15
+  return np.sin(5 * x) * np.cos(3 * x) + np.tanh(x)
+
+def normalize_list(arr):
+    arr = np.array(arr, dtype=np.float32)
+    return (arr - np.mean(arr)) / np.std(arr)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device:", device)
+
+model = nn.Sequential(
+    nn.Linear(1,64),
+    nn.Tanh(),
+    nn.Linear(64,1)
+).to(device)
+
+xlis = np.random.uniform(-10,10,1000)
+xlis = normalize_list(xlis)
+ylis = np.array([funtion(x) for x in xlis], dtype=np.float32)
+
+x_lis_test = sorted([random.uniform(-10, 10) for _ in range(100)])
+x_lis_test = normalize_list(x_lis_test)
+y_lis_test = np.array([funtion(x) for x in x_lis_test],dtype=np.float32)
+
+x = torch.tensor(xlis,dtype=torch.float32).unsqueeze(1).to(device)
+y = torch.tensor(ylis,dtype=torch.float32).unsqueeze(1).to(device)
+
+x_test = torch.tensor(x_lis_test,dtype=torch.float32).unsqueeze(1).to(device)
+y_test = torch.tensor(y_lis_test,dtype=torch.float32).unsqueeze(1).to(device)
+
+dataset = TensorDataset(x,y)
+loader = DataLoader(dataset,batch_size=128,shuffle=True)
+
+criteria = nn.MSELoss()
+optimiser = optim.Adam(model.parameters(),lr=1e-4)
+
+epochs = 5000
+
+loss_lis =[]
+
+for e in range(epochs):
+  for batch_x,batch_y in loader:
+    predictions = model(batch_x)
+    loss = criteria(predictions,batch_y)
+    optimiser.zero_grad()
+    loss.backward()
+    optimiser.step()
+    loss_lis.append(loss.item())
+  if (e)%50==0:
+      plot_pred = model(x_test)
+      plot(x_test,y_test,x_test,plot_pred)
+  if (e) % 50 == 0:
+      print(f"Epoch [{e+1}/{epochs}], Loss: {loss.item():.4f}")
+plot_single(loss_lis)
+print(loss_lis)
